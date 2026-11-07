@@ -4,6 +4,8 @@
 @property NSStatusItem *gptItem;
 @property NSStatusItem *codeItem;
 @property NSStatusItem *cursorItem;
+@property NSStatusItem *antigravityItem;
+@property NSStatusItem *antigravityIDEItem;
 @property NSString *proxy;
 @property NSArray<NSString *> *proxies;
 @property NSString *lastStatus;
@@ -19,9 +21,11 @@
     self.gptItem = [NSStatusBar.systemStatusBar statusItemWithLength:24];
     self.codeItem = [NSStatusBar.systemStatusBar statusItemWithLength:24];
     self.cursorItem = [NSStatusBar.systemStatusBar statusItemWithLength:24];
-    NSArray *items = @[self.gptItem, self.codeItem, self.cursorItem];
-    NSArray *names = @[@"ChatGPT", @"Visual Studio Code", @"Cursor"];
-    NSArray *symbols = @[@"bubble.left.and.bubble.right.fill", @"chevron.left.forwardslash.chevron.right", @"cursorarrow"];
+    self.antigravityItem = [NSStatusBar.systemStatusBar statusItemWithLength:24];
+    self.antigravityIDEItem = [NSStatusBar.systemStatusBar statusItemWithLength:24];
+    NSArray *items = @[self.gptItem, self.codeItem, self.cursorItem, self.antigravityItem, self.antigravityIDEItem];
+    NSArray *names = @[@"ChatGPT", @"Visual Studio Code", @"Cursor", @"Antigravity", @"Antigravity IDE"];
+    NSArray *symbols = @[@"bubble.left.and.bubble.right.fill", @"chevron.left.forwardslash.chevron.right", @"cursorarrow", @"sparkles", @"hammer"];
     for (NSUInteger i = 0; i < items.count; i++) {
         NSStatusItem *item = items[i];
         NSString *filename = [names[i] stringByAppendingString:@".app"];
@@ -40,6 +44,8 @@
     self.gptItem.button.action = @selector(clickGPT:);
     self.codeItem.button.action = @selector(clickCode:);
     self.cursorItem.button.action = @selector(clickCursor:);
+    self.antigravityItem.button.action = @selector(clickAntigravity:);
+    self.antigravityIDEItem.button.action = @selector(clickAntigravityIDE:);
     for (NSStatusItem *item in items) {
         item.button.target = self;
         item.button.font = [NSFont systemFontOfSize:12 weight:NSFontWeightMedium];
@@ -53,6 +59,8 @@
     self.gptItem.button.toolTip = [@"ChatGPT\n" stringByAppendingString:tip];
     self.codeItem.button.toolTip = [@"VS Code\n" stringByAppendingString:tip];
     self.cursorItem.button.toolTip = [@"Cursor\n" stringByAppendingString:tip];
+    self.antigravityItem.button.toolTip = [@"Antigravity\n" stringByAppendingString:tip];
+    self.antigravityIDEItem.button.toolTip = [@"Antigravity IDE\n" stringByAppendingString:tip];
 }
 - (void)showError:(NSString *)text {
     [NSApp activateIgnoringOtherApps:YES];
@@ -66,7 +74,7 @@
     NSEvent *event = NSApp.currentEvent;
     if (event.type != NSEventTypeRightMouseUp) return NO;
     NSMenu *menu = [NSMenu new];
-    NSMenuItem *heading = [[NSMenuItem alloc] initWithTitle:@"选择代理（适用于全部三个应用）" action:nil keyEquivalent:@""];
+    NSMenuItem *heading = [[NSMenuItem alloc] initWithTitle:@"选择代理（适用于全部应用）" action:nil keyEquivalent:@""];
     heading.enabled = NO;
     [menu addItem:heading];
     menu.autoenablesItems = NO;
@@ -100,6 +108,12 @@
 }
 - (void)clickCursor:(NSStatusBarButton *)button {
     if (![self showMenuIfNeeded:button]) [self launch:@"Cursor" bundleID:@"com.todesktop.230313mzl4w4u92"];
+}
+- (void)clickAntigravity:(NSStatusBarButton *)button {
+    if (![self showMenuIfNeeded:button]) [self launch:@"Antigravity" bundleID:@"com.google.antigravity"];
+}
+- (void)clickAntigravityIDE:(NSStatusBarButton *)button {
+    if (![self showMenuIfNeeded:button]) [self launch:@"Antigravity IDE" bundleID:@"com.google.antigravity-ide"];
 }
 - (void)openChatGPT { [self launch:@"ChatGPT" bundleID:@"com.openai.codex"]; }
 - (void)openCode { [self launch:@"Visual Studio Code" bundleID:@"com.microsoft.VSCode"]; }

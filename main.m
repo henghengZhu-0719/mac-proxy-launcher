@@ -1,66 +1,72 @@
 #import <AppKit/AppKit.h>
 
-@interface Launcher : NSObject <NSApplicationDelegate>
-@property NSStatusItem *gptItem;
-@property NSStatusItem *codeItem;
-@property NSStatusItem *cursorItem;
-@property NSStatusItem *antigravityItem;
-@property NSStatusItem *antigravityIDEItem;
+@interface Launcher : NSObject <NSApplicationDelegate, NSMenuDelegate>
+@property NSStatusItem *statusItem;
 @property NSString *proxy;
-@property NSArray<NSString *> *proxies;
 @property NSString *lastStatus;
 @property NSMutableSet<NSString *> *launching;
 @end
 @implementation Launcher
 - (void)applicationDidFinishLaunching:(NSNotification *)note {
-    self.proxies = @[@"http://10.126.126.1:8787", @"http://10.144.144.1:8788"];
-    NSString *saved = [NSUserDefaults.standardUserDefaults stringForKey:@"selectedProxy"];
-    self.proxy = [self.proxies containsObject:saved] ? saved : self.proxies.firstObject;
+    self.proxy = @"http://10.126.126.1:8787";
+    [NSUserDefaults.standardUserDefaults removeObjectForKey:@"selectedProxy"];
     self.launching = [NSMutableSet new];
     [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
-    self.gptItem = [NSStatusBar.systemStatusBar statusItemWithLength:24];
-    self.codeItem = [NSStatusBar.systemStatusBar statusItemWithLength:24];
-    self.cursorItem = [NSStatusBar.systemStatusBar statusItemWithLength:24];
-    self.antigravityItem = [NSStatusBar.systemStatusBar statusItemWithLength:24];
-    self.antigravityIDEItem = [NSStatusBar.systemStatusBar statusItemWithLength:24];
-    NSArray *items = @[self.gptItem, self.codeItem, self.cursorItem, self.antigravityItem, self.antigravityIDEItem];
-    NSArray *names = @[@"ChatGPT", @"Visual Studio Code", @"Cursor", @"Antigravity", @"Antigravity IDE"];
-    NSArray *symbols = @[@"bubble.left.and.bubble.right.fill", @"chevron.left.forwardslash.chevron.right", @"cursorarrow", @"sparkles", @"hammer"];
-    for (NSUInteger i = 0; i < items.count; i++) {
-        NSStatusItem *item = items[i];
-        NSString *filename = [names[i] stringByAppendingString:@".app"];
-        NSString *path = [@"/Applications" stringByAppendingPathComponent:filename];
-        if (![NSFileManager.defaultManager fileExistsAtPath:path])
-            path = [[NSHomeDirectory() stringByAppendingPathComponent:@"Applications"] stringByAppendingPathComponent:filename];
-        NSImage *icon = [NSFileManager.defaultManager fileExistsAtPath:path] ?
-            [NSWorkspace.sharedWorkspace iconForFile:path] :
-            [NSImage imageWithSystemSymbolName:symbols[i] accessibilityDescription:names[i]];
-        icon.size = NSMakeSize(16, 16);
-        item.button.title = @"";
-        item.button.image = icon;
-        item.button.imagePosition = NSImageOnly;
-        [item.button setAccessibilityLabel:names[i]];
-    }
-    self.gptItem.button.action = @selector(clickGPT:);
-    self.codeItem.button.action = @selector(clickCode:);
-    self.cursorItem.button.action = @selector(clickCursor:);
-    self.antigravityItem.button.action = @selector(clickAntigravity:);
-    self.antigravityIDEItem.button.action = @selector(clickAntigravityIDE:);
-    for (NSStatusItem *item in items) {
-        item.button.target = self;
-        item.button.font = [NSFont systemFontOfSize:12 weight:NSFontWeightMedium];
-        [item.button sendActionOn:NSEventMaskLeftMouseUp | NSEventMaskRightMouseUp];
-    }
-    [self setStatus:@"先连接 EasyTier。左键启动或强制重启应用，右键选择代理或退出。"];
+    self.statusItem = [NSStatusBar.systemStatusBar statusItemWithLength:NSSquareStatusItemLength];
+    NSString *iconPath = [NSBundle.mainBundle pathForResource:@"LauncherIcon" ofType:@"png"];
+    NSImage *icon = [[NSImage alloc] initWithContentsOfFile:iconPath];
+    icon.size = NSMakeSize(18, 18);
+    icon.template = NO;
+    self.statusItem.button.image = icon;
+    self.statusItem.button.imagePosition = NSImageOnly;
+    [self.statusItem.button setAccessibilityLabel:@"代理启动器"];
+    NSMenu *menu = [NSMenu new];
+    menu.delegate = self;
+    menu.autoenablesItems = NO;
+    self.statusItem.menu = menu;
+    [self setStatus:@"代理启动器"];
 }
 - (void)setStatus:(NSString *)text {
     self.lastStatus = text;
-    NSString *tip = [NSString stringWithFormat:@"%@\n代理：%@\n右键选择代理或退出", text, self.proxy];
-    self.gptItem.button.toolTip = [@"ChatGPT\n" stringByAppendingString:tip];
-    self.codeItem.button.toolTip = [@"VS Code\n" stringByAppendingString:tip];
-    self.cursorItem.button.toolTip = [@"Cursor\n" stringByAppendingString:tip];
-    self.antigravityItem.button.toolTip = [@"Antigravity\n" stringByAppendingString:tip];
-    self.antigravityIDEItem.button.toolTip = [@"Antigravity IDE\n" stringByAppendingString:tip];
+    self.statusItem.button.toolTip = [NSString stringWithFormat:@"%@\n%@", text, self.proxy];
+}
+- (void)menuNeedsUpdate:(NSMenu *)menu {
+    [menu removeAllItems];
+    NSArray *names = @[@"ChatGPT", @"Visual Studio Code", @"Cursor", @"Antigravity", @"Antigravity IDE"];
+    NSArray *symbols = @[@"bubble.left.and.bubble.right.fill", @"chevron.left.forwardslash.chevron.right", @"cursorarrow", @"sparkles", @"hammer"];
+    NSArray *bundleIDs = @[@"com.openai.codex", @"com.microsoft.VSCode", @"com.todesktop.230313mzl4w4u92", @"com.google.antigravity", @"com.google.antigravity-ide"];
+    for (NSUInteger i = 0; i < names.count; i++) {
+        NSString *name = names[i];
+        BOOL launching = [self.launching containsObject:name];
+        NSString *title = launching ? [name stringByAppendingString:@"…"] : name;
+        NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:title action:@selector(selectApplication:) keyEquivalent:@""];
+        item.target = self;
+        item.representedObject = @{@"name":name, @"bundleID":bundleIDs[i]};
+        item.enabled = !launching;
+        item.toolTip = @"启动或强制重启";
+        NSString *filename = [name stringByAppendingString:@".app"];
+        NSString *path = [@"/Applications" stringByAppendingPathComponent:filename];
+        if (![NSFileManager.defaultManager fileExistsAtPath:path])
+            path = [[NSHomeDirectory() stringByAppendingPathComponent:@"Applications"] stringByAppendingPathComponent:filename];
+        NSImage *image = [NSFileManager.defaultManager fileExistsAtPath:path] ?
+            [NSWorkspace.sharedWorkspace iconForFile:path] :
+            [NSImage imageWithSystemSymbolName:symbols[i] accessibilityDescription:name];
+        image.size = NSMakeSize(16, 16);
+        item.image = image;
+        [menu addItem:item];
+    }
+    [menu addItem:NSMenuItem.separatorItem];
+    NSMenuItem *proxyItem = [[NSMenuItem alloc] initWithTitle:[self.proxy substringFromIndex:7] action:nil keyEquivalent:@""];
+    proxyItem.enabled = NO;
+    [menu addItem:proxyItem];
+    [menu addItem:NSMenuItem.separatorItem];
+    NSMenuItem *quit = [[NSMenuItem alloc] initWithTitle:@"退出" action:@selector(terminate:) keyEquivalent:@""];
+    quit.target = NSApp;
+    [menu addItem:quit];
+}
+- (void)selectApplication:(NSMenuItem *)sender {
+    NSDictionary *application = sender.representedObject;
+    [self launch:application[@"name"] bundleID:application[@"bundleID"]];
 }
 - (void)showError:(NSString *)text {
     [NSApp activateIgnoringOtherApps:YES];
@@ -70,53 +76,6 @@
     [alert addButtonWithTitle:@"好"];
     [alert runModal];
 }
-- (BOOL)showMenuIfNeeded:(NSStatusBarButton *)button {
-    NSEvent *event = NSApp.currentEvent;
-    if (event.type != NSEventTypeRightMouseUp) return NO;
-    NSMenu *menu = [NSMenu new];
-    NSMenuItem *heading = [[NSMenuItem alloc] initWithTitle:@"选择代理（适用于全部应用）" action:nil keyEquivalent:@""];
-    heading.enabled = NO;
-    [menu addItem:heading];
-    menu.autoenablesItems = NO;
-    for (NSString *proxy in self.proxies) {
-        NSMenuItem *option = [[NSMenuItem alloc] initWithTitle:[proxy substringFromIndex:7] action:@selector(selectProxy:) keyEquivalent:@""];
-        option.target = self;
-        option.representedObject = proxy;
-        option.state = [proxy isEqualToString:self.proxy] ? NSControlStateValueOn : NSControlStateValueOff;
-        option.enabled = self.launching.count == 0;
-        [menu addItem:option];
-    }
-    [menu addItem:NSMenuItem.separatorItem];
-    NSMenuItem *quit = [[NSMenuItem alloc] initWithTitle:@"退出代理启动器" action:@selector(terminate:) keyEquivalent:@""];
-    quit.target = NSApp;
-    [menu addItem:quit];
-    [NSMenu popUpContextMenu:menu withEvent:event forView:button];
-    return YES;
-}
-- (void)selectProxy:(NSMenuItem *)sender {
-    NSString *selected = sender.representedObject;
-    if (self.launching.count || ![self.proxies containsObject:selected]) return;
-    self.proxy = selected;
-    [NSUserDefaults.standardUserDefaults setObject:selected forKey:@"selectedProxy"];
-    [self setStatus:@"已选择代理。点击应用图标，以所选代理启动或强制重启。"];
-}
-- (void)clickGPT:(NSStatusBarButton *)button {
-    if (![self showMenuIfNeeded:button]) [self openChatGPT];
-}
-- (void)clickCode:(NSStatusBarButton *)button {
-    if (![self showMenuIfNeeded:button]) [self openCode];
-}
-- (void)clickCursor:(NSStatusBarButton *)button {
-    if (![self showMenuIfNeeded:button]) [self launch:@"Cursor" bundleID:@"com.todesktop.230313mzl4w4u92"];
-}
-- (void)clickAntigravity:(NSStatusBarButton *)button {
-    if (![self showMenuIfNeeded:button]) [self launch:@"Antigravity" bundleID:@"com.google.antigravity"];
-}
-- (void)clickAntigravityIDE:(NSStatusBarButton *)button {
-    if (![self showMenuIfNeeded:button]) [self launch:@"Antigravity IDE" bundleID:@"com.google.antigravity-ide"];
-}
-- (void)openChatGPT { [self launch:@"ChatGPT" bundleID:@"com.openai.codex"]; }
-- (void)openCode { [self launch:@"Visual Studio Code" bundleID:@"com.microsoft.VSCode"]; }
 - (void)launch:(NSString *)name bundleID:(NSString *)bundleID {
     if ([self.launching containsObject:name]) return;
     NSURL *url = nil;
